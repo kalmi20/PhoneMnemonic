@@ -1,7 +1,7 @@
 package com.emarsys.mnemonic.service;
 
 import com.emarsys.mnemonic.dao.IndexDao;
-import com.emarsys.mnemonic.dao.IndexDaoImpl;
+import com.emarsys.mnemonic.dao.JsonIndexDaoImpl;
 
 public class ServiceFactory {
 
@@ -11,10 +11,8 @@ public class ServiceFactory {
      * @return An initalized Service object
      */
     public PhoneMnemonicService create(final String indexDirectory) {
-        IndexDao indexDao = new IndexDaoImpl(indexDirectory);
+        IndexDao indexDao = new JsonIndexDaoImpl(indexDirectory);
 
-        PhoneMnemonicService phoneMnemonicService = new PhoneMnemonicServiceImpl(indexDao);
-
-        return phoneMnemonicService;
+        return new PhoneMnemonicServiceImpl(indexDao);
     }
 }

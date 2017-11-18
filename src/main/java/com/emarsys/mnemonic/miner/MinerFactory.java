@@ -2,7 +2,7 @@ package com.emarsys.mnemonic.miner;
 
 
 import com.emarsys.mnemonic.dao.IndexDao;
-import com.emarsys.mnemonic.dao.IndexDaoImpl;
+import com.emarsys.mnemonic.dao.JsonIndexDaoImpl;
 
 public class MinerFactory {
 
@@ -12,12 +12,10 @@ public class MinerFactory {
      * @return An initalized MinerImpl object
      */
     public Miner create(final String indexDirectory, final String sourceDirectory) {
-        IndexDao indexDao = new IndexDaoImpl(indexDirectory);
+        IndexDao indexDao = new JsonIndexDaoImpl(indexDirectory);
 
         PhoneNumberCalculator phoneNumberCalculator = new PhoneNumberCalculatorImpl();
 
-        Miner miner = new MinerImpl(sourceDirectory, phoneNumberCalculator, indexDao);
-
-        return miner;
+        return new MinerImpl(sourceDirectory, phoneNumberCalculator, indexDao);
     }
 }

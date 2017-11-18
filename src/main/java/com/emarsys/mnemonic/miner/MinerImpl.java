@@ -110,6 +110,10 @@ public class MinerImpl implements Miner {
             final String phoneNumber = phoneNumberCalculator.calcPhoneNumber(mnemonic);
             int numOfDocumentContainingMnemonic = fileOccurenceMap.getValue().entrySet().size();
 
+            //discard words that do not occur at least in 3 different documents
+            if(numOfDocumentContainingMnemonic < 3)
+                return;
+
             final double[] maxTfIdforMnemonic = {Double.MIN_VALUE};
             fileOccurenceMap.getValue().entrySet().forEach(docOccurence -> {
                 String fileName = docOccurence.getKey();

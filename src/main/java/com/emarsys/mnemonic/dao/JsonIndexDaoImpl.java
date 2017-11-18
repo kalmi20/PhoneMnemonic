@@ -13,17 +13,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-public class IndexDaoImpl implements IndexDao {
+public class JsonIndexDaoImpl implements IndexDao {
 
     private static final String extension = "idx";
     private String indexDirectory;
     private ObjectMapper mapper;
 
-    public IndexDaoImpl(String indexDirectory) {
+    public JsonIndexDaoImpl(String indexDirectory) {
         this.mapper = new ObjectMapper();
         this.indexDirectory = indexDirectory;
     }
 
+    /**
+     * Persists the internal representaiton of the tf-idf indices into a json file
+     *
+     * @param tfIdfIndex
+     */
     @Override
     public void persist(TfIdfIndex tfIdfIndex) {
         FileOutputStream fout = null;
@@ -47,6 +52,11 @@ public class IndexDaoImpl implements IndexDao {
         }
     }
 
+    /**
+     * Reads a json idx file into memory
+     *
+     * @return
+     */
     @Override
     public List<TfIdfIndex> readIndexes() {
         File dir = new File(indexDirectory);
@@ -63,7 +73,7 @@ public class IndexDaoImpl implements IndexDao {
                     .forEach(path -> {
                         try (
                                 InputStream file = new FileInputStream(path.toFile());
-                                InputStream buffer = new BufferedInputStream(file);
+                                InputStream buffer = new BufferedInputStream(file)
                         ) {
                             indices.add(mapper.readValue(buffer, TfIdfIndex.class));
                         } catch (IOException e) {

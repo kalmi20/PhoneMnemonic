@@ -1,6 +1,6 @@
 package com.emarsys.mnemonic;
 
-import com.emarsys.mnemonic.miner.MinerImpl;
+import com.emarsys.mnemonic.miner.Miner;
 import com.emarsys.mnemonic.miner.MinerFactory;
 import com.emarsys.mnemonic.service.OutputTransformer;
 import com.emarsys.mnemonic.service.PhoneMnemonicService;
@@ -57,7 +57,7 @@ public class Main {
 
         String taskToPerform = cmd.getOptionValue("task");
         if (taskToPerform.equalsIgnoreCase("mine")) {
-            MinerImpl miner = minerFactory.create(indexDirectoryArgumentValue, sourceDirectoryArgumentValue);
+            Miner miner = minerFactory.create(indexDirectoryArgumentValue, sourceDirectoryArgumentValue);
             miner.mine();
 
         } else if (taskToPerform.equalsIgnoreCase("service")) {
