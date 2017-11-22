@@ -1,9 +1,15 @@
 package com.emarsys.mnemonic.miner.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.io.Serializable;
 
 public class MnemonicTfIdf implements Serializable {
+
+    @JsonProperty("k")
     private String mnemonic;
+
+    @JsonProperty("v")
     private Double tfIdf;
 
     public MnemonicTfIdf() {

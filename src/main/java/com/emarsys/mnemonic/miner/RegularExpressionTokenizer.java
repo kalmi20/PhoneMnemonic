@@ -13,7 +13,7 @@ public class RegularExpressionTokenizer implements Tokenizer {
     }
 
     public RegularExpressionTokenizer() {
-        this(Pattern.compile("[a-zA-Z0-9]{3,12}"));
+        this(Pattern.compile("\\b[a-zA-Z]{3,12}\\b"));
     }
 
     @Override

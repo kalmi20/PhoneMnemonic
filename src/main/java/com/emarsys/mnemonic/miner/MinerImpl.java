@@ -2,6 +2,7 @@ package com.emarsys.mnemonic.miner;
 
 import com.emarsys.mnemonic.dao.IndexDao;
 import com.emarsys.mnemonic.miner.model.MnemonicTfIdf;
+import com.emarsys.mnemonic.miner.model.PhoneMnemonic;
 import com.emarsys.mnemonic.miner.model.TfIdfIndex;
 import org.apache.log4j.Logger;
 
@@ -30,24 +31,26 @@ public class MinerImpl implements Miner {
     private final String sourceDirectory;
     private PhoneNumberCalculator phoneNumberCalculator;
     private IndexDao indexDao;
+    private MnemonicConverter mNemonicConverter;
     private int numberOfDocs = 0;
 
-    public MinerImpl(String sourceDirectory, PhoneNumberCalculator phoneNumberCalculator, IndexDao indexDao) {
+    public MinerImpl(String sourceDirectory, PhoneNumberCalculator phoneNumberCalculator, IndexDao indexDao, MnemonicConverter mnemonicConverter) {
         this.sourceDirectory = sourceDirectory;
         this.phoneNumberCalculator = phoneNumberCalculator;
         this.indexDao = indexDao;
+        mNemonicConverter = mnemonicConverter;
     }
 
     /**
      * Method iterates trough  all the text files located in the source directory, calculates the tf-idf value for each
      * token, and creates the index structure in below structure.
-     *  {
-     *      "id":"201711181541",
-     *      "tfIdfMap":{
-     *          "467748257":[{"mnemonic":"hospitals","tfIdf":0.0457755120278379}, ...],
-     *          ...
-     *      }
-     *	}
+     * {
+     * "id":"201711181541",
+     * "tfIdfMap":{
+     * "467748257":[{"mnemonic":"hospitals","tfIdf":0.0457755120278379}, ...],
+     * ...
+     * }
+     * }
      * id: id and the name of the index file
      * tfIdfMap: Map of the generated phone numbers, value is a list of mnemonic and tfidf value pairs
      */
@@ -109,7 +112,7 @@ public class MinerImpl implements Miner {
             throw new RuntimeException("Exception occured during mining process, exception: " + e.getMessage());
         }
 
-        logger.debug("Mining took: " + (start - System.currentTimeMillis()) / 1000 / 60 + " minutes");
+        logger.debug("Mining took: " + (System.currentTimeMillis() - start) / 1000 / 60 + " minutes");
         logger.debug("Started tf-idf calculateion");
         Map<String, List<MnemonicTfIdf>> tfIdfMap = calculatetfIdfValues(numOfTokensInFileMap, mnemonicsCountInfFilesMap);
 
@@ -120,8 +123,6 @@ public class MinerImpl implements Miner {
     private Map<String, List<MnemonicTfIdf>> calculatetfIdfValues(Map<String, Integer> numOfTokensInFileMap, Map<String, Map<String, Integer>> mnemonicsCountInfFilesMap) {
         Map<String, List<MnemonicTfIdf>> tfIdfMap = new TreeMap<>();
         mnemonicsCountInfFilesMap.entrySet().parallelStream().forEach(fileOccurenceMap -> {
-            final String mnemonic = fileOccurenceMap.getKey();
-            final String phoneNumber = phoneNumberCalculator.calcPhoneNumber(mnemonic);
             int numOfDocumentContainingMnemonic = fileOccurenceMap.getValue().entrySet().size();
 
             //discard words that do not occur at least in 3 different documents
@@ -140,18 +141,22 @@ public class MinerImpl implements Miner {
                     maxTfIdforMnemonic[0] = tfidf;
             });
 
+            List<String> convertedMnemonics = mNemonicConverter.convertMnemonic(fileOccurenceMap.getKey());
+            final List<PhoneMnemonic> phoneNumberMnemonics = phoneNumberCalculator.calcPhoneNumbers(convertedMnemonics);
+
             synchronized (tfIdfMap) {
-                List<MnemonicTfIdf> mnemonicTfIdfs = tfIdfMap.get(phoneNumber);
-                if (mnemonicTfIdfs == null) {
-                    ArrayList<MnemonicTfIdf> mNemonicList = new ArrayList<>();
-                    mNemonicList.add(new MnemonicTfIdf(mnemonic, maxTfIdforMnemonic[0]));
-                    tfIdfMap.put(phoneNumber, mNemonicList);
-                } else {
-                    mnemonicTfIdfs.add(new MnemonicTfIdf(mnemonic, maxTfIdforMnemonic[0]));
-                }
+                phoneNumberMnemonics.forEach(phoneMnemonic -> {
+                    List<MnemonicTfIdf> mnemonicTfIdfs = tfIdfMap.get(phoneMnemonic.getPhoneNumber());
+                    if (mnemonicTfIdfs == null) {
+                        ArrayList<MnemonicTfIdf> mNemonicList = new ArrayList<>();
+                        mNemonicList.add(new MnemonicTfIdf(phoneMnemonic.getmNemonic(), maxTfIdforMnemonic[0]));
+                        tfIdfMap.put(phoneMnemonic.getPhoneNumber(), mNemonicList);
+                    } else {
+                        mnemonicTfIdfs.add(new MnemonicTfIdf(phoneMnemonic.getmNemonic(), maxTfIdforMnemonic[0]));
+                    }
+                });
             }
         });
-
         return tfIdfMap;
     }
 }
