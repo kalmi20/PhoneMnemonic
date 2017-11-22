@@ -25,8 +25,8 @@ public class OutputTransformer {
                 .append(": ")
                 .append(stringListEntry.getValue()
                         .stream()
-                        .sorted(Comparator.comparing(MnemonicTfIdf::getMnemonic).reversed())
-                        .map(mnemonicTfIdf -> mnemonicTfIdf.getMnemonic() + " " + df.format(mnemonicTfIdf.getTfIdf()))
+                        .sorted(Comparator.comparing(MnemonicTfIdf::getTfIdf).reversed())
+                        .map(mnemonicTfIdf -> mnemonicTfIdf.getMnemonic() + " (" + df.format(mnemonicTfIdf.getTfIdf()) + ")")
                         .collect(Collectors.joining(",")))
                 .append(System.lineSeparator()));
 

@@ -3,6 +3,7 @@ package com.emarsys.mnemonic.miner;
 import com.emarsys.mnemonic.dao.IndexDao;
 import com.emarsys.mnemonic.miner.model.MnemonicTfIdf;
 import com.emarsys.mnemonic.miner.model.TfIdfIndex;
+import org.apache.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -14,10 +15,15 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public class MinerImpl implements Miner {
+
+    final static Logger logger = Logger.getLogger(MinerImpl.class);
+
 
     private static final String extension = "txt";
 
@@ -49,38 +55,44 @@ public class MinerImpl implements Miner {
     public void mine() {
         File dir = new File(sourceDirectory);
         if (!dir.exists())
-            throw new IllegalArgumentException("Source directory doesn't exists");
+            throw new IllegalArgumentException("Source directory doesn't exists, " + dir.getPath());
 
         RegularExpressionTokenizer mnemonicTokenizer = new RegularExpressionTokenizer();
         RegularExpressionTokenizer worldsTokenizer = new RegularExpressionTokenizer(Pattern.compile("\\b\\w\\w+\\b"));
-        Map<String, Integer> numOfTokensInFileMap = new HashMap<>();
-        Map<String, Map<String, Integer>> mnemonicsCountInfFilesMap = new HashMap<>();
+        Map<String, Integer> numOfTokensInFileMap = new ConcurrentHashMap<>();
+        Map<String, Map<String, Integer>> mnemonicsCountInfFilesMap = new TreeMap<>();
 
         Path sourceDirectoryPath = Paths.get(sourceDirectory);
         final PathMatcher filter = sourceDirectoryPath.getFileSystem().getPathMatcher("glob:**/*." + extension);
-        try (Stream<Path> paths = Files.walk(Paths.get(sourceDirectory))) {
+
+        logger.debug("parallelism: " + ForkJoinPool.getCommonPoolParallelism());
+        long start = System.currentTimeMillis();
+        try (Stream<Path> paths = Files.walk(Paths.get(sourceDirectory)).parallel()) {
             paths.filter(filter::matches).forEach(path ->
                     {
                         int numberOfTokensInFile = 0;
                         numberOfDocs++;
                         try (BufferedReader in = new BufferedReader(new FileReader(path.toFile()))) {
+                            logger.debug("Processing file:" + path.getFileName());
                             String read = null;
                             while ((read = in.readLine()) != null) {
                                 List<String> mnemonics = mnemonicTokenizer.tokenize(read);
 
                                 mnemonics.forEach(mnemonic ->
                                 {
-                                    Map<String, Integer> occurenceInFiles = mnemonicsCountInfFilesMap.get(mnemonic);
-                                    if (occurenceInFiles == null) {
-                                        occurenceInFiles = new HashMap<>();
-                                        occurenceInFiles.put(path.toString(), 1);
-                                        mnemonicsCountInfFilesMap.put(mnemonic, occurenceInFiles);
-                                    } else {
-                                        Integer occurenceCount = occurenceInFiles.get(path.toString());
-                                        if (occurenceCount == null) {
+                                    synchronized (mnemonicsCountInfFilesMap) {
+                                        Map<String, Integer> occurenceInFiles = mnemonicsCountInfFilesMap.get(mnemonic);
+                                        if (occurenceInFiles == null) {
+                                            occurenceInFiles = new HashMap<>();
                                             occurenceInFiles.put(path.toString(), 1);
+                                            mnemonicsCountInfFilesMap.put(mnemonic, occurenceInFiles);
                                         } else {
-                                            occurenceInFiles.put(path.toString(), ++occurenceCount);
+                                            Integer occurenceCount = occurenceInFiles.get(path.toString());
+                                            if (occurenceCount == null) {
+                                                occurenceInFiles.put(path.toString(), 1);
+                                            } else {
+                                                occurenceInFiles.put(path.toString(), ++occurenceCount);
+                                            }
                                         }
                                     }
                                 });
@@ -97,6 +109,8 @@ public class MinerImpl implements Miner {
             throw new RuntimeException("Exception occured during mining process, exception: " + e.getMessage());
         }
 
+        logger.debug("Mining took: " + (start - System.currentTimeMillis()) / 1000 / 60 + " minutes");
+        logger.debug("Started tf-idf calculateion");
         Map<String, List<MnemonicTfIdf>> tfIdfMap = calculatetfIdfValues(numOfTokensInFileMap, mnemonicsCountInfFilesMap);
 
         String id = new SimpleDateFormat("yyyyMMddHHmm").format(new Date());
@@ -104,14 +118,14 @@ public class MinerImpl implements Miner {
     }
 
     private Map<String, List<MnemonicTfIdf>> calculatetfIdfValues(Map<String, Integer> numOfTokensInFileMap, Map<String, Map<String, Integer>> mnemonicsCountInfFilesMap) {
-        Map<String, List<MnemonicTfIdf>> tfIdfMap = new HashMap<>();
+        Map<String, List<MnemonicTfIdf>> tfIdfMap = new TreeMap<>();
         mnemonicsCountInfFilesMap.entrySet().parallelStream().forEach(fileOccurenceMap -> {
             final String mnemonic = fileOccurenceMap.getKey();
             final String phoneNumber = phoneNumberCalculator.calcPhoneNumber(mnemonic);
             int numOfDocumentContainingMnemonic = fileOccurenceMap.getValue().entrySet().size();
 
             //discard words that do not occur at least in 3 different documents
-            if(numOfDocumentContainingMnemonic < 3)
+            if (numOfDocumentContainingMnemonic < 3)
                 return;
 
             final double[] maxTfIdforMnemonic = {Double.MIN_VALUE};
@@ -126,13 +140,15 @@ public class MinerImpl implements Miner {
                     maxTfIdforMnemonic[0] = tfidf;
             });
 
-            List<MnemonicTfIdf> mnemonicTfIdfs = tfIdfMap.get(phoneNumber);
-            if (mnemonicTfIdfs == null) {
-                ArrayList<MnemonicTfIdf> mNemonicList = new ArrayList<>();
-                mNemonicList.add(new MnemonicTfIdf(mnemonic, maxTfIdforMnemonic[0]));
-                tfIdfMap.put(phoneNumber, mNemonicList);
-            } else {
-                mnemonicTfIdfs.add(new MnemonicTfIdf(mnemonic, maxTfIdforMnemonic[0]));
+            synchronized (tfIdfMap) {
+                List<MnemonicTfIdf> mnemonicTfIdfs = tfIdfMap.get(phoneNumber);
+                if (mnemonicTfIdfs == null) {
+                    ArrayList<MnemonicTfIdf> mNemonicList = new ArrayList<>();
+                    mNemonicList.add(new MnemonicTfIdf(mnemonic, maxTfIdforMnemonic[0]));
+                    tfIdfMap.put(phoneNumber, mNemonicList);
+                } else {
+                    mnemonicTfIdfs.add(new MnemonicTfIdf(mnemonic, maxTfIdforMnemonic[0]));
+                }
             }
         });
 

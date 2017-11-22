@@ -5,10 +5,7 @@ import com.emarsys.mnemonic.dao.IndexDao;
 import com.emarsys.mnemonic.miner.model.MnemonicTfIdf;
 import com.emarsys.mnemonic.miner.model.TfIdfIndex;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class PhoneMnemonicServiceImpl implements PhoneMnemonicService {
 
@@ -37,7 +34,9 @@ public class PhoneMnemonicServiceImpl implements PhoneMnemonicService {
     }
 
     /**
-     * Looks up the mnemonics with their tfidf value for the input phone number
+     * Looks up the mnemonics with their tfidf value for the input phone number, if it is present in multiple files, then
+     * it pick the one with the greater tfidf value
+     *
      * @param phoneNumber
      * @return A list of mnemonics with their tfIdf value
      */
@@ -45,10 +44,30 @@ public class PhoneMnemonicServiceImpl implements PhoneMnemonicService {
     public List<MnemonicTfIdf> getMnemonicsForPhoneNumber(final String phoneNumber) {
         List<MnemonicTfIdf> result = new ArrayList<>();
         for (TfIdfIndex tfIdfIndice : tfIdfIndices) {
-            List<MnemonicTfIdf> mnemonicTfIdfs = tfIdfIndice.getTfIdfMap().get(phoneNumber);
-            if (mnemonicTfIdfs == null || mnemonicTfIdfs.size() == 0)
+            List<MnemonicTfIdf> mnemonicTfIdfsToAdd = tfIdfIndice.getTfIdfMap().get(phoneNumber);
+            if (mnemonicTfIdfsToAdd == null || mnemonicTfIdfsToAdd.size() == 0)
                 continue;
-            result.addAll(mnemonicTfIdfs);
+
+            if (result.size() > 0) {
+                mnemonicTfIdfsToAdd.forEach(mnemonicTfIdf -> {
+                    Optional<MnemonicTfIdf> first = result
+                            .stream()
+                            .filter(mnemonicTfIdf1 -> mnemonicTfIdf1.getMnemonic().equalsIgnoreCase(mnemonicTfIdf.getMnemonic()))
+                            .findFirst();
+
+                    if (first.isPresent()) {
+                        if (first.get().getTfIdf() < mnemonicTfIdf.getTfIdf()) {
+                            first.get().setTfIdf(mnemonicTfIdf.getTfIdf());
+                        }
+                    } else {
+                        result.add(mnemonicTfIdf);
+                    }
+                });
+            }
+            else
+            {
+                result.addAll(mnemonicTfIdfsToAdd);
+            }
         }
         return result;
     }

@@ -1,7 +1,6 @@
 package com.emarsys.mnemonic.miner.model;
 
 import java.io.Serializable;
-import java.text.DecimalFormat;
 
 public class MnemonicTfIdf implements Serializable {
     private String mnemonic;
