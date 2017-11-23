@@ -30,13 +30,9 @@ e.g.: service.sh C:\\indexDir
 ## Bonuses
 Bonus 1 : implemented
 
-Bonus 2 : not implemented
+Bonus 2 : Started implementation, ran out of time
 
 Bonus 3 : Miner uses java8 forkJoinPools for processing the data, to set the parallelism level please specify
 -Djava.util.concurrent.ForkJoinPool.common.parallelism=$PARALELLISM in the data-mine.sh, If not set default value is number of cpu cores minus 1.
 
 Bonus 4 : Service reads all the .idx files inside the source directory and does the look up in all of them, to find the mnemonic.
-
-.\service.sh C:\\out2
-.\data-mine.sh C:\\out2 C:\\files2\\txt\\txt
-.\data-mine.sh C:\\out2 C:\files
