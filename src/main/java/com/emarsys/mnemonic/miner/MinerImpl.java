@@ -61,7 +61,7 @@ public class MinerImpl implements Miner {
             throw new IllegalArgumentException("Source directory doesn't exists, " + dir.getPath());
 
         RegularExpressionTokenizer mnemonicTokenizer = new RegularExpressionTokenizer();
-        RegularExpressionTokenizer worldsTokenizer = new RegularExpressionTokenizer(Pattern.compile("\\b\\w\\w+\\b"));
+        RegularExpressionTokenizer worldsTokenizer = new RegularExpressionTokenizer(Pattern.compile("\\b\\w+\\b"));
         Map<String, Integer> numOfTokensInFileMap = new ConcurrentHashMap<>();
         Map<String, Map<String, Integer>> mnemonicsCountInfFilesMap = new TreeMap<>();
 
@@ -80,25 +80,16 @@ public class MinerImpl implements Miner {
                             String read = null;
                             while ((read = in.readLine()) != null) {
                                 List<String> mnemonics = mnemonicTokenizer.tokenize(read);
-
-                                mnemonics.forEach(mnemonic ->
-                                {
-                                    synchronized (mnemonicsCountInfFilesMap) {
-                                        Map<String, Integer> occurenceInFiles = mnemonicsCountInfFilesMap.get(mnemonic);
-                                        if (occurenceInFiles == null) {
-                                            occurenceInFiles = new HashMap<>();
-                                            occurenceInFiles.put(path.toString(), 1);
-                                            mnemonicsCountInfFilesMap.put(mnemonic, occurenceInFiles);
-                                        } else {
-                                            Integer occurenceCount = occurenceInFiles.get(path.toString());
-                                            if (occurenceCount == null) {
-                                                occurenceInFiles.put(path.toString(), 1);
-                                            } else {
-                                                occurenceInFiles.put(path.toString(), ++occurenceCount);
-                                            }
-                                        }
-                                    }
-                                });
+                                synchronized (mnemonicsCountInfFilesMap) {
+                                    mnemonics.forEach(mnemonic ->
+                                    {
+                                        mnemonicsCountInfFilesMap.computeIfAbsent(mnemonic, key -> {
+                                            Map<String, Integer> m = new ConcurrentHashMap<>();
+                                            m.put(path.toString(), 1);
+                                            return m;
+                                        }).compute(path.toString(), (key, value) -> value == null ? Integer.valueOf(1) : ++value);
+                                    });
+                                }
                                 numberOfTokensInFile += worldsTokenizer.tokenize(read).size();
                             }
                             numOfTokensInFileMap.put(path.toString(), numberOfTokensInFile);
@@ -132,7 +123,7 @@ public class MinerImpl implements Miner {
             final double[] maxTfIdforMnemonic = {Double.MIN_VALUE};
             fileOccurenceMap.getValue().entrySet().forEach(docOccurence -> {
                 String fileName = docOccurence.getKey();
-                int mnemonicCountInFile = docOccurence.getValue();
+                Integer mnemonicCountInFile = docOccurence.getValue();
 
                 Integer numberOfTokensInFile = numOfTokensInFileMap.get(fileName);
                 double tfidf = (((double) mnemonicCountInFile) / numberOfTokensInFile) * Math.log(numberOfDocs / (1 + numOfDocumentContainingMnemonic));
